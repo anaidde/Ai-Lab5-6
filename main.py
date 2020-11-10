@@ -1,131 +1,196 @@
-class Game:
-    class PlaceStateEnum:
-        green = 1
-        red = 2
-        white = 0
+import random
+from enum import IntEnum, Enum
+import copy
 
-    class DirectionStateEnum:
-        up = 1
-        down = 2
-        left = 3
-        right = 4
+
+class Game:
+    class __PositionValuesEnum(IntEnum):
+        WHITE = 0
+        PLAYER_1 = 1
+        PLAYER_2 = 2
+
+    class __PawnMoves(Enum):
+        UP = (1, 0)
+        UPRIGHT = (1, 1)
+        RIGHT = (0, 1)
+        DOWNRIGHT = (-1, 1)
+        DOWN = (-1, 0)
+        DOWNLEFT = (-1, -1)
+        LEFT = (0, -1)
+        UPLEFT = (1, -1)
 
     def __init__(self):
-        self.board = [[Game.PlaceStateEnum.green, Game.PlaceStateEnum.green, Game.PlaceStateEnum.green,
-                       Game.PlaceStateEnum.green],
-                      [Game.PlaceStateEnum.white, Game.PlaceStateEnum.white, Game.PlaceStateEnum.white,
-                       Game.PlaceStateEnum.white],
-                      [Game.PlaceStateEnum.white, Game.PlaceStateEnum.white, Game.PlaceStateEnum.white,
-                       Game.PlaceStateEnum.white],
-                      [Game.PlaceStateEnum.red, Game.PlaceStateEnum.red, Game.PlaceStateEnum.red,
-                       Game.PlaceStateEnum.red]]
+        self.__board = [
+            [position_value for i in range(4)]
+            for position_value in (
+                Game.__PositionValuesEnum.PLAYER_1,
+                Game.__PositionValuesEnum.WHITE,
+                Game.__PositionValuesEnum.WHITE,
+                Game.__PositionValuesEnum.PLAYER_2
+            )
+        ]
 
-    def is_final_state(self):
-        if Game.PlaceStateEnum.white in self.board[0] and Game.PlaceStateEnum.white in self.board[3]:
-            return False
+        self.__board_labels_x = ['A', 'B', 'C', 'D']
+        self.__board_labels_y = ['1', '2', '3', '4']
 
-        if Game.PlaceStateEnum.green in self.board[0]:
-            return False
+    def print_board(self):
+        print()
 
-        if Game.PlaceStateEnum.red in self.board[3]:
-            return False
+        for i in reversed(range(4)):
+            print(self.__board_labels_y[i], end='    ')
+            for j in range(4):
+                print(int(self.__board[i][j]), end=' ')
+            print()
+        print()
 
-        return True
+        print(end='     ')
+        for board_label_x in self.__board_labels_x:
+            print(board_label_x, end=' ')
+        print()
 
-    def movement(self, player1, pawn_position, direction):
-        if not pawn_position[0] in range(4) or not pawn_position[1] in range(4):
-            return False
-        if player1:
-            if not self.board[pawn_position[0]][pawn_position[1]] == Game.PlaceStateEnum.green:
-                return False
-        else:
-            if not self.board[pawn_position[0]][pawn_position[1]] == Game.PlaceStateEnum.red:
-                return False
+    def get_pawn_possible_moves(self, is_user_turn, pawn_position):
+        allowed_pawn_value = \
+            Game.__PositionValuesEnum.PLAYER_1 if is_user_turn else Game.__PositionValuesEnum.PLAYER_2
 
-        previous_pawn_position = pawn_position
+        if not self.__board[pawn_position[0]][pawn_position[1]] == allowed_pawn_value:
+            return None
 
-        if direction == Game.DirectionStateEnum.up:
-            pawn_position = (pawn_position[0] - 1, pawn_position[1])
-        elif direction == Game.DirectionStateEnum.down:
-            pawn_position = (pawn_position[0] + 1, pawn_position[1])
-        elif direction == Game.DirectionStateEnum.left:
-            pawn_position = (pawn_position[0], pawn_position[1] - 1)
-        else:
-            pawn_position = (pawn_position[0], pawn_position[1] + 1)
+        return [pawn_move.name for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move)]
 
-        if self.__is_valid_state(pawn_position):
-            self.board[pawn_position[0]][pawn_position[1]] = Game.PlaceStateEnum.green if player1 else Game.PlaceStateEnum.red
-            self.board[previous_pawn_position[0]][previous_pawn_position[1]] = Game.PlaceStateEnum.white
-            return True
+    def perform_move(self, is_user_turn, pawn_position, pawn_move):
+        if is_user_turn and self.__board[pawn_position[0]][pawn_position[1]] != Game.__PositionValuesEnum.PLAYER_1:
+            return None
+        if not is_user_turn and self.__board[pawn_position[0]][pawn_position[1]] != Game.__PositionValuesEnum.PLAYER_2:
+            return None
+        if not self.__can_perform_move(pawn_position, pawn_move):
+            return None
+
+        self.__board[pawn_position[0]][pawn_position[1]] = Game.__PositionValuesEnum.WHITE
+        self.__board[pawn_position[0] + pawn_move.value[0]][pawn_position[1] + pawn_move.value[1]] = \
+            Game.__PositionValuesEnum.PLAYER_1 if is_user_turn else Game.__PositionValuesEnum.PLAYER_2
+
+    def is_final_state(self, board=None):
+        if board is None:
+            board = self.__board
+        player1_won = True
+        player2_won = True
+        for i in range(4):
+            if board[0][i] != Game.__PositionValuesEnum.PLAYER_2:
+                player2_won = False
+            if board[3][i] != Game.__PositionValuesEnum.PLAYER_1:
+                player1_won = False
+
+        if player1_won:
+            return 1
+        if player2_won:
+            return 2
         return False
 
-    def __is_valid_state(self, pawn_position): # functia de validare a starilor
-        if pawn_position[0] < 0 or pawn_position[0] > 3:
-            return False
-        if pawn_position[1] < 0 or pawn_position[1] > 3:
-            return False
+    def get_pawn_position_from_board_labels(self, board_labels):
+        return ord(board_labels[1]) - ord('1'), ord(board_labels[0]) - ord('A')
 
-        if self.board[pawn_position[0]][pawn_position[1]] != Game.PlaceStateEnum.white:
-            return False
+    def str_to_pawn_move(self, pawn_move_str):
+        return Game.__PawnMoves[pawn_move_str]
 
-        return True
+    def __can_perform_move(self, pawn_position, pawn_move, board=None):
+        if board is None:
+            board = self.__board
+        future_pawn_position = (pawn_position[0] + pawn_move.value[0], pawn_position[1] + pawn_move.value[1])
+        return (
+                future_pawn_position[0] in range(4) and future_pawn_position[1] in range(4) and
+                board[future_pawn_position[0]][future_pawn_position[1]] == Game.__PositionValuesEnum.WHITE
+        )
 
-    def __get_possible_movement(self, pawn_position, player1): # Euristica
-        up = self.movement(player1, pawn_position, Game.DirectionStateEnum.up)
-        down = self.movement(player1, pawn_position, Game.DirectionStateEnum.down)
-        left = self.movement(player1, pawn_position, Game.DirectionStateEnum.left)
-        right = self.movement(player1, pawn_position, Game.DirectionStateEnum.right)
+    def __heuristic(self, board, is_maximizing):
+        score = 0
+        for i in range(4):
+            for j in range(4):
+                if board[i][j] == Game.__PositionValuesEnum.PLAYER_2:
+                    score += 4 - i
+                elif board[i][j] == Game.__PositionValuesEnum.PLAYER_1:
+                    score -= i
 
-        up_score = None if up is None else 1 if player1 else -1
-        down_score = None if down is None else -1 if player1 else 1
-        left_score = 0 if left is not None else None
-        right_score = 0 if right is not None else None
+        return score if is_maximizing else -score
 
-        return ((Game.DirectionStateEnum.up, up_score),
-                (Game.DirectionStateEnum.down, down_score),
-                (Game.DirectionStateEnum.left, left_score),
-                (Game.DirectionStateEnum.right, right_score))
+    def __minimax(self, board, pawn_position, pawn_move, depth, is_maximizing):
+        if depth == 0 or self.is_final_state(board):
+            return self.__heuristic(board, is_maximizing)
 
-    def interface(self):
-        for raw in self.board:
-            for element in raw:
-                print(element, end=' ')
-            print()
+        board[pawn_position[0]][pawn_position[1]] = Game.__PositionValuesEnum.WHITE
+        board[pawn_position[0] + pawn_move.value[0]][pawn_position[1] + pawn_move.value[1]] = \
+            Game.__PositionValuesEnum.PLAYER_2 if is_maximizing else Game.__PositionValuesEnum.PLAYER_1
+
+        pawn_positions = [
+            (i, j) for i in range(4) for j in range(4)
+            if board[i][j] == (Game.__PositionValuesEnum.PLAYER_2 if is_maximizing else Game.__PositionValuesEnum.PLAYER_1)
+        ]
+
+        minimax_output = [
+            self.__minimax(board, pawn_position, pawn_move, depth - 1, not is_maximizing)
+            for pawn_position in sorted(pawn_positions, key=lambda x: random.random())
+            for pawn_move in
+            sorted([pawn_move for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move, board)], key=lambda x: random.random())
+        ]
+
+        if is_maximizing:
+            return max(minimax_output)
+
+        return min(minimax_output)
+
+    def perform_minimax(self):
+        board = copy.deepcopy(self.__board)
+
+        pawn_positions = [(i, j) for i in range(4) for j in range(4) if
+                          board[i][j] == Game.__PositionValuesEnum.PLAYER_2]
+
+        minimax_output = [
+            (
+                self.__minimax(board, pawn_position, pawn_move, 7, True),
+                pawn_position,
+                pawn_move
+            )
+            for pawn_position in pawn_positions
+            for pawn_move in
+            [pawn_move for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move, board)]
+        ]
+
+        max_output = max(minimax_output, key=lambda item: item[0])
+        minimax_output = [minimax_output_instance for minimax_output_instance in minimax_output if
+                          minimax_output_instance[0] == max_output[0]]
+
+        return random.choice(minimax_output)
 
 
-game = Game()
+if __name__ == '__main__':
+    game = Game()
+    user_turn = True
+    winner = False
 
-player_1 = True
-game_running = True
+    while not winner:
+        game.print_board()
 
-while game_running:
-    game.interface()
-    print("Is player1's turn") if player_1 else print("Is player2's turn")
-    print("Choose pawn: ")
-    pawn_chosen_x = int(input())
-    pawn_chosen_y = int(input())
-    print("Choose a direction to move: ")
-    direction_chosen = input()
-    if direction_chosen == "up":
-        direction_chosen = Game.DirectionStateEnum.up
-    elif direction_chosen == "down":
-        direction_chosen = Game.DirectionStateEnum.down
-    elif direction_chosen == "left":
-        direction_chosen = Game.DirectionStateEnum.left
-    elif direction_chosen == "right":
-        direction_chosen = Game.DirectionStateEnum.right
-    else:
-        print("Incorrect choice!")
-        continue
-    pawn_chosen = (pawn_chosen_x, pawn_chosen_y)
-    if not game.movement(player_1, pawn_chosen, direction_chosen):
-        print("Impossible move!")
-        continue
-    if game.is_final_state():
-        print("Player1 is the winner") if player_1 else print("Player2's is the winner")
-        game_running = False
-        continue
+        if user_turn:
+            pawn_choice = input('Select a pawn ([A-B][1-4]): ')
+            pawn_position = game.get_pawn_position_from_board_labels(pawn_choice)
 
-    player_1 = not player_1
+            pawn_possible_moves = game.get_pawn_possible_moves(True, pawn_position)
+            if pawn_possible_moves is None:
+                print('Not a/Not your pawn!')
+                continue
 
-game.interface()
+            pawn_move_choice = input('Select which direction you want to move the pawn: (' + \
+                                     '/'.join(pawn_possible_moves) + '): ').upper()
+            pawn_move = game.str_to_pawn_move(pawn_move_choice)
+
+            game.perform_move(True, pawn_position, pawn_move)
+        else:
+            minimax_output = game.perform_minimax()
+            print(minimax_output[0])
+
+            game.perform_move(False, minimax_output[1], minimax_output[2])
+
+        user_turn = not user_turn
+        winner = game.is_final_state()
+
+    game.print_board()
+    print('Player ' + str(winner) + ' won!')
