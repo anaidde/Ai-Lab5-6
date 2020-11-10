@@ -88,9 +88,17 @@ class Game:
         return False
 
     def get_pawn_position_from_board_labels(self, board_labels):
-        return ord(board_labels[1]) - ord('1'), ord(board_labels[0]) - ord('A')
+        if len(board_labels) != 2:
+            return None
+        x_coord = ord(board_labels[1]) - ord('1')
+        y_coord = ord(board_labels[0]) - ord('A')
+        if x_coord not in range(4) or y_coord not in range(4):
+            return None
+        return x_coord, y_coord
 
     def str_to_pawn_move(self, pawn_move_str):
+        if pawn_move_str not in Game.__PawnMoves.__members__:
+            return None
         return Game.__PawnMoves[pawn_move_str]
 
     def __can_perform_move(self, pawn_position, pawn_move, board=None):
@@ -191,15 +199,24 @@ if __name__ == '__main__':
         if user_turn:
             pawn_choice = input('Select a pawn ([A-B][1-4]): ')
             pawn_position = game.get_pawn_position_from_board_labels(pawn_choice)
+            if pawn_position is None:
+                print()
+                print('Not a/Not your pawn!')
+                continue
 
             pawn_possible_moves = game.get_pawn_possible_moves(True, pawn_position)
             if pawn_possible_moves is None:
+                print()
                 print('Not a/Not your pawn!')
                 continue
 
             pawn_move_choice = input('Select which direction you want to move the pawn: (' + \
                                      '/'.join(pawn_possible_moves) + '): ').upper()
             pawn_move = game.str_to_pawn_move(pawn_move_choice)
+            if pawn_move is None:
+                print()
+                print('Invalid move!')
+                continue
 
             game.perform_move(True, pawn_position, pawn_move)
         else:
