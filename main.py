@@ -1,6 +1,7 @@
 import random
-from enum import IntEnum, Enum
 import copy
+import math
+from enum import IntEnum, Enum
 
 
 class Game:
@@ -110,9 +111,18 @@ class Game:
                 elif board[i][j] == Game.__PositionValuesEnum.PLAYER_1:
                     score -= i
 
-        return score if is_maximizing else -score
+        return -score if is_maximizing else score
+
+    def __alpha_beta_prune(self, is_maximizing, pawn_moves):
+        pruned_pawn_moves = [pawn_move for pawn_move in pawn_moves if
+                             (is_maximizing and pawn_move.value[0] > 0) or (not is_maximizing and pawn_move.value[0] < 0)
+                            ]
+
+        return pawn_moves if len(pruned_pawn_moves) == 0 else pruned_pawn_moves
 
     def __minimax(self, board, pawn_position, pawn_move, depth, is_maximizing):
+        board_copy = copy.deepcopy(board)
+
         if depth == 0 or self.is_final_state(board):
             return self.__heuristic(board, is_maximizing)
 
@@ -129,13 +139,19 @@ class Game:
             self.__minimax(board, pawn_position, pawn_move, depth - 1, not is_maximizing)
             for pawn_position in sorted(pawn_positions, key=lambda x: random.random())
             for pawn_move in
-            sorted([pawn_move for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move, board)], key=lambda x: random.random())
+            self.__alpha_beta_prune(
+                is_maximizing,
+                sorted(
+                    [pawn_move for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move, board_copy)],
+                    key=lambda x: random.random()
+                )
+            )
         ]
 
-        if is_maximizing:
-            return max(minimax_output)
+        if len(minimax_output) == 0:
+            return -math.inf if is_maximizing else -math.inf
 
-        return min(minimax_output)
+        return max(minimax_output) if is_maximizing else min(minimax_output)
 
     def perform_minimax(self):
         board = copy.deepcopy(self.__board)
@@ -145,13 +161,16 @@ class Game:
 
         minimax_output = [
             (
-                self.__minimax(board, pawn_position, pawn_move, 7, True),
+                self.__minimax(board, pawn_position, pawn_move, 8, True),
                 pawn_position,
                 pawn_move
             )
             for pawn_position in pawn_positions
             for pawn_move in
-            [pawn_move for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move, board)]
+            self.__alpha_beta_prune(
+                True,
+                [pawn_move for pawn_move in Game.__PawnMoves if self.__can_perform_move(pawn_position, pawn_move)]
+            )
         ]
 
         max_output = max(minimax_output, key=lambda item: item[0])
@@ -185,7 +204,6 @@ if __name__ == '__main__':
             game.perform_move(True, pawn_position, pawn_move)
         else:
             minimax_output = game.perform_minimax()
-            print(minimax_output[0])
 
             game.perform_move(False, minimax_output[1], minimax_output[2])
 
